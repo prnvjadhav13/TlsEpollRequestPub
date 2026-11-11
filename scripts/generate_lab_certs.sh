@@ -8,8 +8,8 @@ umask 077
 usage() {
     cat <<'EOF'
 Usage:
-  ./generate_lab_certs.sh [options]
-  ./generate_lab_certs.sh [output-dir [server-dns [server-ip [client-name [encrypted|unencrypted]]]]]
+  ./scripts/generate_lab_certs.sh [options]
+  ./scripts/generate_lab_certs.sh [output-dir [server-dns [server-ip [client-name [encrypted|unencrypted]]]]]
 
 Recommended named options:
   --output-dir <path>     Destination directory (default: certs/lab)
@@ -21,10 +21,10 @@ Recommended named options:
   -h, --help             Show this help and exit
 
 Secure interactive lab example (default):
-  ./generate_lab_certs.sh --output-dir certs/lab-secure --encrypted
+  ./scripts/generate_lab_certs.sh --output-dir certs/lab-secure --encrypted
 
 Insecure disposable test example:
-  ./generate_lab_certs.sh --output-dir certs/lab-ci --unencrypted
+  ./scripts/generate_lab_certs.sh --output-dir certs/lab-ci --unencrypted
 
 Security notes:
   --encrypted asks for separate CA, server, and client passphrases. Re-enter the

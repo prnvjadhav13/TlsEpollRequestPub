@@ -132,11 +132,12 @@ There is no automatic TLS-to-plaintext downgrade. TLS startup fails closed when
 credentials are absent or invalid. Run the modes on different ports when testing
 them concurrently.
 
-`secure_transport.h` and `secure_transport.cpp` form the transport abstraction
-below the application framing. They own the OpenSSL contexts and sessions and
-expose handshake, read, write, and shutdown operations. The request/response
-code therefore operates on the same plaintext application messages in both
-modes; TLS encrypts and authenticates those bytes before socket I/O.
+`include/tls/secure_transport.h` and `src/tls/secure_transport.cpp` form the
+transport abstraction below the application framing. They own the OpenSSL
+contexts and sessions and expose handshake, read, write, and shutdown
+operations. The request/response code therefore operates on the same plaintext
+application messages in both modes; TLS encrypts and authenticates those bytes
+before socket I/O.
 
 ### Enforced TLS policy
 
@@ -177,12 +178,12 @@ validation, requires an exact DNS or URI SAN match from the allowlist.
 For a local lab, generate a private test CA and distinct server/client identities:
 
 ```bash
-./generate_lab_certs.sh --output-dir certs/lab \
+./scripts/generate_lab_certs.sh --output-dir certs/lab \
     --server-dns localhost --server-ip 127.0.0.1 \
     --client-name tcp-client-01 --encrypted
 ```
 
-Run `./generate_lab_certs.sh --help` for all arguments, secure and insecure
+Run `./scripts/generate_lab_certs.sh --help` for all arguments, secure and insecure
 examples, and warnings about unencrypted keys. Named options are recommended
 because they avoid ambiguity in the legacy positional form.
 
@@ -206,7 +207,7 @@ For disposable automated lab tests only, append `unencrypted` as the fifth
 argument:
 
 ```bash
-./generate_lab_certs.sh --output-dir certs/lab-ci \
+./scripts/generate_lab_certs.sh --output-dir certs/lab-ci \
     --server-dns localhost --server-ip 127.0.0.1 \
     --client-name tcp-client-ci --unencrypted
 ```
@@ -333,8 +334,8 @@ The main components are:
 
 The public reusable interfaces live under `include/epoll_runtime/`.
 `protocol.h` decouples application behavior from socket readiness and TLS;
-`server_protocol.h` remains a compatibility include. `EventLoop` receives an
-injected `ProtocolFactory` and creates one
+`include/tcp/server_protocol.h` remains a compatibility include. `EventLoop`
+receives an injected `ProtocolFactory` and creates one
 `ProtocolConnection` per accepted client. The event loop knows only how to:
 
 - accept and own nonblocking connections;
@@ -372,9 +373,9 @@ prevents an `SSL_pending()` stall without allowing one busy TLS connection to
 monopolize its event-loop thread.
 
 The reusable surface is intentionally incremental. The mapping example and the
-Linux `EventLoop::Impl` currently share `tcp_server_epoll.cpp`; future extraction
-can move that implementation into a runtime library without changing the public
-protocol, connection-ID, or executor contracts.
+Linux `EventLoop::Impl` currently share `src/server/tcp_server_epoll.cpp`;
+future extraction can move that implementation into a runtime library without
+changing the public protocol, connection-ID, or executor contracts.
 
 The deliberately small protocol accepts newline-terminated request keys. A
 known key returns a four-byte big-endian payload length followed by its binary
@@ -396,14 +397,17 @@ only objective is maximum uninterrupted throughput.
 
 ```text
 TlsEpollRequestPub/
-├── include/epoll_runtime/   Public reusable event-loop/protocol interfaces
-├── src/runtime/             Runtime implementation components
+├── include/
+│   ├── epoll_runtime/       Public event-loop/protocol interfaces
+│   ├── tcp/                 TCP configuration and compatibility interfaces
+│   └── tls/                 TLS transport interface
+├── src/
+│   ├── client/              Concurrent TCP/TLS benchmark client
+│   ├── runtime/             Reusable runtime implementations
+│   ├── server/              Epoll server and mapping-service example
+│   └── tls/                 OpenSSL TLS context and session implementation
+├── scripts/                 Lab-only certificate generator
 ├── tests/                   Runtime contract tests
-├── secure_transport.*       OpenSSL TLS context and session abstraction
-├── tcp_server_epoll.*       Epoll server and mapping-service example
-├── tcp_client.cpp           Concurrent TCP/TLS benchmark client
-├── tcp_common_config.h      Shared application framing limits
-├── generate_lab_certs.sh    Lab-only CA and certificate generator
 ├── Makefile                 Build and test targets
 ├── README.md                Usage, architecture, and security guidance
 └── LICENSE                  Repository usage terms
@@ -414,7 +418,7 @@ the certificate generator belong in Git. The ignored `build/`, `cert/`, and
 `certs/` directories are local generated material. Generated mapping files,
 client request-key lists, binaries, private keys, passphrase files, logs, and
 crash dumps must not be committed. A clean checkout recreates required binaries
-with `make` and lab credentials with `generate_lab_certs.sh`.
+with `make` and lab credentials with `scripts/generate_lab_certs.sh`.
 
 ## Requirements
 
@@ -505,7 +509,7 @@ Generate encrypted lab-only mTLS credentials. OpenSSL will ask for distinct CA,
 server-key, and client-key passphrases as described in the TLS section above:
 
 ```bash
-./generate_lab_certs.sh --output-dir certs/lab \
+./scripts/generate_lab_certs.sh --output-dir certs/lab \
     --server-dns localhost --server-ip 127.0.0.1 \
     --client-name tcp-client-01 --encrypted
 ```

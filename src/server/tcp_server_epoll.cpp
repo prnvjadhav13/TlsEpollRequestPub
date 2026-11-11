@@ -53,9 +53,9 @@
 #include <boost/unordered/unordered_flat_map.hpp>
 
 
-#include "tcp_common_config.h"
-#include "tcp_server_epoll.h"
-#include "secure_transport.h"
+#include "tcp/common_config.h"
+#include "tcp/server_epoll.h"
+#include "tls/secure_transport.h"
 #include "epoll_runtime/connection_id.h"
 
 namespace {

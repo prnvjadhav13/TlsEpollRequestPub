@@ -35,8 +35,8 @@
 #include <poll.h>
 #include <unistd.h>
 
-#include "tcp_common_config.h"
-#include "secure_transport.h"
+#include "tcp/common_config.h"
+#include "tls/secure_transport.h"
 
 namespace {
 
