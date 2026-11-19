@@ -1,68 +1,64 @@
 # TlsEpollRequestPub
 
-TlsEpollRequestPub is a C++23/Linux systems-programming project for learning
-how to add production-oriented TLS protection to a scalable, nonblocking TCP
-data path. It is designed as a practical reference and reusable starting point
-that could be extended for a future business-critical service whose
-authenticated clients connect across a LAN, WAN, or the Internet.
-The project combines an `epoll`-based server, bounded event-loop and worker
-architectures, an OpenSSL transport layer, and a concurrent benchmark client
-that can run on the same host or on a separate machine. The same application
-protocol can run over mutually authenticated TLS or explicit plaintext TCP,
-allowing the security, latency, throughput, CPU, and connection-management
-costs of both transport modes to be measured with comparable application
-workloads.
+TlsEpollRequestPub is a C++23/Linux educational and benchmarking project that
+demonstrates how to secure TCP application traffic with OpenSSL. It combines a
+nonblocking, multi-worker Linux `epoll` server, a reusable TLS transport layer,
+and a concurrent client that exercises a small request/response protocol over
+mutually authenticated TLS (mTLS). The same workload can also run over
+explicitly selected plaintext TCP, providing a baseline for comparing
+application throughput and resource use.
+
+The project is intended to explain and measure the integration of TLS into an
+event-driven TCP application. The benchmark client reuses persistent
+connections, so request-throughput runs amortize connection setup and the TLS
+handshake over many requests. A reconnect performs a new full handshake;
+handshake latency is not reported as a separate benchmark metric.
 
 ## Purpose
 
-### Personal design focus
+### Project focus
 
-This portfolio version presents the author’s work on a Linux C++23 benchmark
-environment: a nonblocking `epoll` request path, an OpenSSL transport
-abstraction, mutual-TLS policy and certificate validation, bounded concurrency
-primitives, and a client that exercises comparable TCP and TLS workloads. It
-is intentionally a learning and benchmarking project, not a copy of an
-employer or customer service.
+The implementation keeps the application protocol separate from TCP readiness
+and TLS so that the same request workload can be exercised over either
+transport. Its main components are:
 
-The project demonstrates how to:
+- **Concurrent client:** a bounded worker pool keeps a persistent connection per
+  worker and sends one request/response transaction at a time on that
+  connection. It runs closed-loop rounds and reports request throughput,
+  response bandwidth, elapsed time, failures, and negotiated TLS version/cipher.
+- **TCP/TLS event-loop server:** each worker thread owns a level-triggered
+  `epoll` loop, a `SO_REUSEPORT` listener, and its connections. Bounded work per
+  event, connection and handshake limits, progress/idle deadlines, and graceful
+  shutdown control resource use.
+- **OpenSSL transport:** a shared abstraction owns TLS contexts and per-socket
+  sessions. The event loop advances handshakes and `SSL_read_ex`/`SSL_write_ex`
+  operations as socket readiness changes, handling OpenSSL's `WANT_READ` and
+  `WANT_WRITE` retry states without blocking the server worker.
+- **mTLS policy:** TLS 1.3 is the default, with a restricted TLS 1.2 option.
+  The client validates the server chain and DNS/IP identity; the server requires
+  a trusted client certificate and checks its SAN against an allowlist.
+  Resumption and early data are disabled so each new connection uses a full
+  handshake.
+- **Replaceable protocol and mapping example:** `ProtocolConnection` isolates
+  request parsing and response generation from transport code. The included
+  example maps newline-terminated keys to binary payloads; the server retains
+  the mapping while clients need only a list of request keys.
+- **Reusable runtime utilities:** bounded executor and `eventfd` completion
+  queue components illustrate how applications can offload work without
+  blocking event-loop threads.
 
-- integrate OpenSSL below the application protocol while preserving a common
-  application-data path for TLS and plaintext TCP;
-- use TLS 1.3 by default and optionally measure restricted TLS 1.2 compatibility
-  with explicitly configured ECDHE and AEAD cipher-suite policies;
-- implement mutual TLS, certificate-chain and validity verification, server
-  hostname/IP verification, client SAN authorization, optional CRL checking,
-  encrypted private-key loading, and validated certificate reloads;
-- disable legacy protocol versions, TLS compression, renegotiation, session
-  resumption, and TLS 1.3 early data to keep the educational security model
-  explicit and resistant to downgrade and replay mistakes;
-- advance nonblocking TLS handshakes and OpenSSL read/write retry states within
-  level-triggered `epoll` event loops without blocking an event-loop thread;
-- handle many TCP connections using multiple independent event loops,
-  `SO_REUSEPORT` listeners, per-loop ownership, and bounded work per event;
-- provide reusable bounded executor and `eventfd` completion-queue primitives
-  for future services that must offload work without blocking event loops;
-- process fragmented and pipelined requests, partial TCP/TLS writes, disconnects,
-  stale epoll events, and file-descriptor reuse safely;
-- enforce limits and absolute deadlines for connections, TLS handshakes,
-  incomplete requests, queued responses, and idle sessions;
-- use RAII for sockets, epoll descriptors, OpenSSL objects, threads, mapped
-  memory, and sensitive passphrase storage;
-- separate reusable event-loop, protocol, completion, and transport concerns
-  from the included request-to-response mapping service;
-- preserve mapping-backed scatter/gather output in plaintext mode and explicit
-  output-buffer lifetime across partial writes and TLS retries;
-- measure request throughput, response bandwidth, handshake outcomes, connection
-  failures, and concurrency behavior over TLS 1.2, TLS 1.3, and plaintext TCP;
-  and
-- provide sanitizer, hardened production-test, and CPU-specific performance
-  builds for correctness and controlled benchmarking.
+For interpretation, the server reports handshake success, failure, and
+capacity-rejection counts at shutdown; it does not report handshake latency.
+The client metrics describe whole request rounds, not isolated TLS operations.
+Comparisons are most useful when the same hosts, workload, connection count,
+build, dataset, and network conditions are used for each transport and TLS
+version.
 
 The project is intended for systems-programming and TLS education, functional
 validation, architecture experiments, and controlled performance comparisons.
-It demonstrates security-conscious implementation techniques but is not, by
-itself, a complete Internet-facing service or a guarantee of production
-security. Application authorization, rate limiting, audit integration, key and
+It demonstrates security-conscious implementation techniques but is not a
+complete Internet-facing service or a guarantee of production security.
+Application authorization, rate limiting, audit integration, key and
 certificate lifecycle automation, operating-system hardening, dependency
 patching, monitoring, and deployment-specific threat controls remain the
 operator's responsibility.
