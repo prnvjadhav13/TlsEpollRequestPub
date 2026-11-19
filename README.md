@@ -372,10 +372,16 @@ puts the generation-tagged connection on a bounded deferred-read queue. This
 prevents an `SSL_pending()` stall without allowing one busy TLS connection to
 monopolize its event-loop thread.
 
-The reusable surface is intentionally incremental. The mapping example and the
-Linux `EventLoop::Impl` currently share `src/server/tcp_server_epoll.cpp`;
-future extraction can move that implementation into a runtime library without
-changing the public protocol, connection-ID, or executor contracts.
+The mapping example is split into focused implementation units: request framing
+and response buffering are in `src/server/mapping_protocol.cpp`, mapping
+generation/loading and lookup are in `src/server/mapping_store.cpp`, and
+descriptor ownership is in `src/server/unique_fd.cpp`. The Linux event loop and
+worker coordinator are in `src/server/event_loop.cpp`; the executable entry
+point and CLI parsing remain in `src/server/tcp_server_epoll.cpp`. Public
+interfaces are declared in `include/tcp/mapping_protocol.h`,
+`include/tcp/mapping_store.h`, `include/tcp/server_runtime.h`, and
+`include/tcp/unique_fd.h`. Private mapping data structures are declared in
+`src/server/mapping_store_internal.hpp`.
 
 The deliberately small protocol accepts newline-terminated request keys. A
 known key returns a four-byte big-endian payload length followed by its binary
@@ -404,7 +410,7 @@ TlsEpollRequestPub/
 ├── src/
 │   ├── client/              Concurrent TCP/TLS benchmark client
 │   ├── runtime/             Reusable runtime implementations
-│   ├── server/              Epoll server and mapping-service example
+│   ├── server/              Epoll server, mapping service, and descriptor owner
 │   └── tls/                 OpenSSL TLS context and session implementation
 ├── scripts/                 Lab-only certificate generator
 ├── tests/                   Runtime contract tests
