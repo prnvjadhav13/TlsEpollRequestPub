@@ -14,6 +14,57 @@ connections, so request-throughput runs amortize connection setup and the TLS
 handshake over many requests. A reconnect performs a new full handshake;
 handshake latency is not reported as a separate benchmark metric.
 
+## Project overview (TLS-secured transport)
+
+This project, which I designed and implemented, explores integrating modern TLS
+into a scalable, event-driven TCP/IP server rather than treating encryption as
+an isolated layer. Its primary objective is to understand and implement the
+interaction between OpenSSL, TLS protocol behaviour, Linux networking
+primitives, asynchronous I/O, resource management, and concurrency at scale.
+
+The project uses mutual TLS (mTLS) to authenticate both peers. TLS 1.3 is the
+default, with a restricted TLS 1.2 option for compatibility testing. The TLS
+1.2 cipher policy permits ECDHE-based cipher suites and excludes static RSA key
+suites to provide forward secrecy. Both peers validate certificate chains; the
+client also verifies the server's DNS identity, while the server authorizes
+client certificates against an exact SAN allowlist. The TLS configuration
+disables legacy protocol versions, session resumption, and early data. I also
+implemented nonblocking TLS handshakes and encrypted data transfer, handling
+OpenSSL `WANT_READ` and `WANT_WRITE` states within an epoll-driven architecture
+without blocking worker threads.
+
+On the Linux side, the project uses a multi-worker architecture where each
+worker owns its own `SO_REUSEPORT` listener socket and epoll event loop. This
+design enables efficient connection distribution across CPU cores while
+avoiding the scalability limitations of traditional thread-per-connection
+approaches. Each worker independently manages connection acceptance, I/O
+processing, TLS state transitions, and response transmission through
+asynchronous, non-blocking operations.
+
+The implementation also explores several production-oriented systems design
+concepts, including:
+
+- Event-driven networking using epoll and non-blocking sockets
+- Scalable connection management and resource isolation across worker threads
+- Back-pressure handling, connection lifecycle management, and graceful shutdown
+  procedures
+- Modern C++23 ownership principles for safe management of file descriptors,
+  memory mappings, and OpenSSL resources
+- Generation-tagged connection identifiers to prevent stale event processing
+  after file descriptor reuse
+- Bounded event-loop processing to maintain responsiveness under load
+- Memory-mapped read-only response data and zero-copy serving techniques to
+  minimise latency and CPU overhead
+- Benchmarking infrastructure capable of comparing plaintext TCP and TLS
+  workloads using identical application-level traffic patterns
+
+This project gave me hands-on experience integrating TLS with event-driven
+networking, asynchronous I/O, concurrency, and resource management. It
+reinforced that secure transport is a core architectural component that
+directly impacts system scalability, performance, reliability, and operational
+efficiency. It reinforced the importance of designing secure systems that
+remain scalable and operationally efficient under load.
+
 ## Purpose
 
 ### Project focus
